@@ -21,10 +21,7 @@ struct ChallengeView: View {
             }
             
             HStack {
-                Image(systemName: "flag.fill")
-                    .background(Color.red)
-                    .frame(width: 100,height: 100)
-                    .border(Color.pink)
+                CountryView(countryCode: "NZ")
                 OptionGrid()
                 
             }
@@ -62,3 +59,14 @@ struct OptionGrid: View {
     }
 }
 
+
+struct CountryView: View {
+    let countryCode: String
+    var body: some View {
+        Image(countryCode)
+            .resizable()
+            .frame(width: 80, height: 60)
+            .clipShape(RoundedRectangle(cornerRadius: 4))
+        
+    }
+}

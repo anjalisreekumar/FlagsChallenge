@@ -6,9 +6,10 @@
 //
 
 import SwiftUI
+import CoreData
 
 struct FlagChallengeMainView: View {
-    @StateObject var viewModel = FlagChallengeViewModel()
+    @StateObject var viewModel: FlagChallengeViewModel
     var body: some View {
         VStack {
             TitleCard()
@@ -19,18 +20,11 @@ struct FlagChallengeMainView: View {
             case .countDown:
                 CountDownView()
             case .challengeView:
-               ChallengeView()
+                ChallengeView()
             case .gameOver:
-                GameOverScoreView(content: .score )
+                GameOverScoreView(content: .gameOver)
             }
-           
         }
-        .onAppear {
-            viewModel.onAction(.loadQuestions)
-        }
+        .environmentObject(viewModel)
     }
-}
-
-#Preview {
-    FlagChallengeMainView()
 }

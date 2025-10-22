@@ -8,18 +8,45 @@
 import SwiftUI
 
 struct ChallengeLandingPage: View {
-    @State var time: String = "0"
+    @EnvironmentObject var viewModel: FlagChallengeViewModel
+    @State var firstHour: String = "0"
+    @State var secondHour: String = "0"
+
+    @State var firstMinutes: String = "0"
+    @State var secondMinutes: String = "0"
+
+    @State var firstSeconds: String = "0"
+    @State var secondSeconds: String = "0"
+
+
     var body: some View {
         VStack {
             Text("Challenge Schedule")
-            
             HStack(spacing: 32){
-                TimeUnitView(firstDigit: $time, secondDigit: $time, label: "Hours")
-                TimeUnitView(firstDigit: $time, secondDigit: $time, label: "Minutes")
-                TimeUnitView(firstDigit: $time, secondDigit: $time, label: "Seconds")
+                TimeUnitView(firstDigit: $firstHour, secondDigit: $secondHour, label: "Hours")
+                TimeUnitView(firstDigit: $firstMinutes, secondDigit: $secondMinutes, label: "Minutes")
+                TimeUnitView(firstDigit: $firstSeconds, secondDigit: $secondSeconds, label: "Seconds")
             }
             Button {
+                
+                let hourFormat = DateFormat(firstDigit: Int(firstHour) ?? 0,
+                                            secondDigit: Int(secondHour) ?? 0,
+                                            type: .hour)
+
+                let minuteFormat = DateFormat(firstDigit: Int(firstMinutes) ?? 0,
+                                              secondDigit: Int(secondMinutes) ?? 0,
+                                              type: .minute)
+
+                let secondFormat = DateFormat(firstDigit: Int(firstSeconds) ?? 0,
+                                              secondDigit: Int(secondSeconds) ?? 0,
+                                              type: .second)
+
+                let scheduledDate = viewModel.scheduledDateFromDigits(hour: hourFormat, minute: minuteFormat, second: secondFormat)
+                
+                viewModel.onAction(.saveSchedulesTime(scheduledDate))
+
                 //save action
+               
             } label: {
                 Text("Save")
                     .foregroundStyle(Color.white)
@@ -27,10 +54,10 @@ struct ChallengeLandingPage: View {
             }
             .buttonStyle(.borderedProminent)
 
-            
         }
-
-        
+        .onAppear {
+            viewModel.fetchCoreDataData()
+        }
     }
 }
 
@@ -45,7 +72,7 @@ struct TitleCard: View {
                 ZStack {
                     Color.black
                     
-                    Text("00:10")
+                    Text("00:00")
                         .font(.system(size: 24))
                         .foregroundColor(.white)
                         .shadow(color: .black, radius: 10, x: 0, y: 0)
@@ -59,6 +86,7 @@ struct TitleCard: View {
                     .font(.system(size: 28))
                     .bold()
                     .foregroundStyle(Color.accent)
+                Spacer()
             }
 
         }
@@ -66,7 +94,6 @@ struct TitleCard: View {
         .padding(.horizontal)
     }
 }
-
 
 
 struct DigitTextField: View {
@@ -82,8 +109,14 @@ struct DigitTextField: View {
                 RoundedRectangle(cornerRadius: 6)
                     .stroke(Color.gray, lineWidth: 1)
             )
+            .onChange(of: value) { _, newValue in
+                if newValue.count > 1 {
+                    value = String(newValue.prefix(1))
+                }
+            }
     }
 }
+
 
 struct TimeUnitView: View {
     @Binding var firstDigit: String
