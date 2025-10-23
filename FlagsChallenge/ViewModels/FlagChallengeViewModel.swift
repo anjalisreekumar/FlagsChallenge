@@ -45,7 +45,7 @@ final class FlagChallengeViewModel: ObservableObject {
     private var intervalTimer: Timer?
     
     @Published var scheduledTime: Date?
-
+    @Published var currentQuestion: Question?
     
     // MARK: - CoreData Context
     private let context: NSManagedObjectContext
@@ -69,7 +69,6 @@ final class FlagChallengeViewModel: ObservableObject {
     private func switchViewTo(_ type: ScreenType) {
         currentView = type
     }
-    
     
     private func loadDataFromJson() {
         guard let url = Bundle.main.url(forResource: "flags-challenge", withExtension: "json") else {
@@ -103,21 +102,36 @@ final class FlagChallengeViewModel: ObservableObject {
     }
     
     func scheduledDateFromDigits(hour: DateFormat, minute: DateFormat, second: DateFormat) -> Date {
-         let calendar = Calendar.current
-         
-         let h = returnDateFrom(format: hour)
-         let m = returnDateFrom(format: minute)
-         let s = returnDateFrom(format: second)
-         
-         var date = calendar.date(bySettingHour: h, minute: m, second: s, of: Date()) ?? Date()
-         
-         // if the time is in the past, schedule it for tomorrow
-         if date < Date() {
-             //check it later
-             date = calendar.date(byAdding: .day, value: 1, to: date) ?? date
-         }
-         return date
-     }
+        // Convert the two digits into a single integer for each component
+        let h = hour.firstDigit * 10 + hour.secondDigit
+        let m = minute.firstDigit * 10 + minute.secondDigit
+        let s = second.firstDigit * 10 + second.secondDigit
+        
+        // Clamp values to valid ranges
+        let clampedH = min(max(h, 0), 23)
+        let clampedM = min(max(m, 0), 59)
+        let clampedS = min(max(s, 0), 59)
+        
+        // Build the date in local time
+        var calendar = Calendar.current
+        calendar.timeZone = .current // ensures local time
+        
+        var components = calendar.dateComponents([.year, .month, .day], from: Date())
+        components.hour = clampedH
+        components.minute = clampedM
+        components.second = clampedS
+        
+        var date = calendar.date(from: components) ?? Date()
+        
+        // If the time is in the past, schedule it for tomorrow
+        if date < Date() {
+            date = calendar.date(byAdding: .day, value: 1, to: date) ?? date
+        }
+        
+        return date
+    }
+
+
     
     private func saveScheduledTime(date: Date) {
         scheduledTime = date
@@ -129,6 +143,8 @@ final class FlagChallengeViewModel: ObservableObject {
 
         save()
         print("Saved scheduled time: \(date)")
+        switchViewTo(.countDown)
+        
     }
     
     func save() {
@@ -143,27 +159,142 @@ final class FlagChallengeViewModel: ObservableObject {
             print("No changes to save")
         }
     }
+
+
+//    func fetchLatestScheduledTime() {
+//        let request: NSFetchRequest<ScheduledChallenge> = ScheduledChallenge.fetchRequest()
+//        request.sortDescriptors = [NSSortDescriptor(keyPath: \ScheduledChallenge.createdAt, ascending: false)]
+//        request.fetchLimit = 1
+//        if let result = try? context.fetch(request).first {
+//            scheduledTime = result.scheduledTime
+//            if let savedDate = result.scheduledTime {
+//                let utcFormatter = DateFormatter()
+//                utcFormatter.timeZone = TimeZone(secondsFromGMT: 0)
+//                utcFormatter.dateFormat = "yyyy-MM-dd HH:mm:ss"
+//                
+//                let localFormatter = DateFormatter()
+//                localFormatter.timeZone = .current
+//                localFormatter.dateFormat = "yyyy-MM-dd HH:mm:ss"
+//                
+//                print("UTC time:", utcFormatter.string(from: savedDate))
+//                print("Local time:", localFormatter.string(from: savedDate))
+//            }
+//
+//        }
+//    }
     
-    func fetchCoreDataData() {
-      let data = loadLatestSchedule()
-        
-        print("fetched all data from cd \(data)")
-        
+    func fetchLatestScheduledTime() {
+        // Hardcode for testing
+        let scheduledDate = Date().addingTimeInterval(20) // 5 seconds from now
+        scheduledTime = scheduledDate
+
+        let utcFormatter = DateFormatter()
+        utcFormatter.timeZone = TimeZone(secondsFromGMT: 0)
+        utcFormatter.dateFormat = "yyyy-MM-dd HH:mm:ss"
+
+        let localFormatter = DateFormatter()
+        localFormatter.timeZone = .current
+        localFormatter.dateFormat = "yyyy-MM-dd HH:mm:ss"
+
+        print("UTC time:", utcFormatter.string(from: scheduledDate))
+        print("Local time:", localFormatter.string(from: scheduledDate))
     }
 
-    func loadLatestSchedule() -> ScheduledChallenge? {
-        let request: NSFetchRequest<ScheduledChallenge> = ScheduledChallenge.fetchRequest()
-        request.sortDescriptors = [NSSortDescriptor(key: "createdAt", ascending: false)]
-        request.fetchLimit = 1
-
-        do {
-            return try context.fetch(request).first
-        } catch {
-            print("Failed to fetch latest schedule: \(error)")
-            return nil
+    
+//    func monitorScheduledTime() {
+//        guard let scheduledTime else { return }
+//
+//        Timer.scheduledTimer(withTimeInterval: 1, repeats: true) { [weak self] timer in
+//            guard let self else { return }
+//
+//            let difference = Int(scheduledTime.timeIntervalSinceNow)
+//            if difference > 20 {
+//                //no change
+//            } else if difference <= 20 && difference > 0 {
+//                switchViewTo(.countDown)
+//            } else if difference <= 0 {
+////                switchViewTo(.challengeView)
+//                timer.invalidate()
+//                startChallenge()
+//            }
+//        }
+//    }
+    
+    func monitorScheduledTime() {
+        var counter = 20
+        
+        Timer.scheduledTimer(withTimeInterval: 1, repeats: true) { [weak self] timer in
+            guard let self else { return }
+            if counter > 0 {
+                self.timeRemaining = counter
+                if counter <= 20 && counter > 0 {
+                    self.switchViewTo(.countDown)
+                }
+                counter -= 1
+            } else {
+                timer.invalidate()
+                self.startChallenge()
+            }
         }
     }
+}
 
-
+extension FlagChallengeViewModel {
+    func startChallenge() {
+        currentView = .challengeView
+        score = 0
+        selectedAnswerId = nil
+        startQuestion(at: 0)
+    }
     
+    private func startQuestion(at index: Int) {
+        guard index < questions.count else {
+            gameOver()
+            return
+        }
+        
+        selectedAnswerId = nil
+        isInterval = false
+        timeRemaining = 30
+        currentQuestion = questions[index]
+        
+        startTimer?.invalidate()
+        startTimer = Timer.scheduledTimer(withTimeInterval: 1, repeats: true) { [weak self] timer in
+            guard let self else { return }
+            timeRemaining -= 1
+            if timeRemaining <= 0 {
+                timer.invalidate()
+                self.handleQuestionEnd(at: index)
+            }
+        }
+    }
+    
+    private func handleQuestionEnd(at index: Int) {
+        isInterval = true
+        timeRemaining = 10
+        intervalTimer?.invalidate()
+        
+        intervalTimer = Timer.scheduledTimer(withTimeInterval: 1, repeats: true) { [weak self] timer in
+            guard let self else { return }
+            timeRemaining -= 1
+            if timeRemaining <= 0 {
+                timer.invalidate()
+                self.startQuestion(at: index + 1)
+            }
+        }
+    }
+    
+    func selectAnswer(for question: Question, selectedIndex: Int) {
+        print("question is \(question), and selected index is \(selectedIndex)")
+        selectedAnswerId = question.countries[selectedIndex].id
+        if selectedAnswerId  == question.answerId {
+            score += 1
+        }
+    }
+    
+    private func gameOver() {
+        startTimer?.invalidate()
+        intervalTimer?.invalidate()
+        currentView = .gameOver
+    }
 }

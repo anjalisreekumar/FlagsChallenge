@@ -42,10 +42,8 @@ struct ChallengeLandingPage: View {
                                               type: .second)
 
                 let scheduledDate = viewModel.scheduledDateFromDigits(hour: hourFormat, minute: minuteFormat, second: secondFormat)
-                
+                print("Local scheduled time:", scheduledDate.formattedLocalString())
                 viewModel.onAction(.saveSchedulesTime(scheduledDate))
-
-                //save action
                
             } label: {
                 Text("Save")
@@ -56,14 +54,15 @@ struct ChallengeLandingPage: View {
 
         }
         .onAppear {
-            viewModel.fetchCoreDataData()
+            viewModel.fetchLatestScheduledTime()
+            viewModel.monitorScheduledTime()
         }
     }
 }
 
-#Preview {
-    ChallengeLandingPage()
-}
+//#Preview {
+//    ChallengeLandingPage()
+//}
 
 struct TitleCard: View {
     var body: some View {
